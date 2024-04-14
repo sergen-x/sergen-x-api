@@ -1,2 +1,4 @@
 # sergen-x-api
-A docker controller to easily manage the creation of game servers.
+This repository contains the backend daemon logic that interacts with 
+podman containers to easily manage the creation and management of game servers.
+Sergen-X is a Go rewrite of the original [Sergen](https://github.com/tomhobson/Sergen) discord bot.
