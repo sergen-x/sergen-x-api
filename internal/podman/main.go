@@ -2,12 +2,11 @@ package podman
 
 import (
 	"context"
-	"fmt"
 	"log"
-	"os"
 
 	"github.com/containers/podman/v5/pkg/bindings"
 	"github.com/containers/podman/v5/pkg/bindings/containers"
+	"github.com/containers/podman/v5/pkg/domain/entities/types"
 	"github.com/containers/podman/v5/pkg/specgen"
 	"github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/sergen-x/sergen-x-api/pkg/utils"
@@ -21,7 +20,7 @@ type Container struct {
 }
 
 type Resouces struct {
-	Memory uint8 // Ram in GB
+	Memory uint8 // Ram in GiB
 }
 
 func init() {
@@ -34,8 +33,7 @@ func init() {
 
 func Start(containerID string) (bool, error) {
 	if err := containers.Start(conn, containerID, nil); err != nil {
-		fmt.Println(err)
-		os.Exit(1)
+		return false, err
 	}
 	return true, nil
 }
@@ -68,11 +66,12 @@ func Create(image string, resources Resouces) (Container, error) {
 }
 
 func Prune() (uint64, error) {
+	var totalPruned uint64
 	report, err := containers.Prune(conn, nil)
 	if err != nil {
-		return 0, err
+		return totalPruned, err
 	}
-	var totalPruned uint64
+
 	for _, container := range report {
 		totalPruned += container.Size
 	}
@@ -82,6 +81,28 @@ func Prune() (uint64, error) {
 
 func Stop(container Container) (bool, error) {
 	if err := containers.Stop(conn, container.Name, nil); err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
+func Update(container Container, newResources Resouces) (bool, error) {
+	ram := utils.GibiBytesToBytes(newResources.Memory)
+	spec := specgen.NewSpecGenerator("", false)
+	spec.ResourceLimits = &specs.LinuxResources{
+		CPU: &specs.LinuxCPU{},
+		Memory: &specs.LinuxMemory{
+			Limit: &ram,
+		},
+	}
+
+	options := types.ContainerUpdateOptions{
+		NameOrID: container.Name,
+		Specgen:  spec,
+	}
+
+	_, err := containers.Update(conn, &options)
+	if err != nil {
 		return false, err
 	}
 	return true, nil
