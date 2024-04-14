@@ -9,6 +9,7 @@ import (
 	"github.com/containers/podman/v5/pkg/bindings"
 	"github.com/containers/podman/v5/pkg/bindings/containers"
 	"github.com/containers/podman/v5/pkg/specgen"
+	"github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/sergen-x/sergen-x-api/pkg/utils"
 )
 
@@ -17,6 +18,10 @@ var conn context.Context
 type Container struct {
 	Name string // UUID corresponding to our database
 	Id   string // Containers unique ID
+}
+
+type Resouces struct {
+	Memory uint8 // Ram in GB
 }
 
 func init() {
@@ -35,16 +40,23 @@ func Start(containerID string) (bool, error) {
 	return true, nil
 }
 
-func Create(image string) (Container, error) {
+func Create(image string, resources Resouces) (Container, error) {
 	// generate a UUID taking the place of a container name
 	containerName, err := utils.GenerateUUID(16)
 	if err != nil {
 		return Container{}, err
 	}
 
-	s := specgen.NewSpecGenerator(image, false)
-	s.Name = containerName
-	response, err := containers.CreateWithSpec(conn, s, nil)
+	spec := specgen.NewSpecGenerator(image, false)
+	ram := utils.GibiBytesToBytes(resources.Memory)
+	spec.ResourceLimits = &specs.LinuxResources{
+		CPU: &specs.LinuxCPU{},
+		Memory: &specs.LinuxMemory{
+			Limit: &ram,
+		},
+	}
+
+	response, err := containers.CreateWithSpec(conn, spec, nil)
 	if err != nil {
 		return Container{}, err
 	}
